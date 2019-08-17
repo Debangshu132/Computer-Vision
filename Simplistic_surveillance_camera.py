@@ -21,7 +21,7 @@ while 1:
         cv2.imwrite('found.png', roi_color) #save the area of interest to memory after every 1.5 seconds
 
     else:
-         cv2.imshow('img', img)     #else show the normal footage
+         cv2.imshow('img', img)                                                   #else show the normal footage
     k = cv2.waitKey(30) & 0xff
 
     if k == 27:
