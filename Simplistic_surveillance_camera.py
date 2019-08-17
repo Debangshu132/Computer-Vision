@@ -14,7 +14,7 @@ while 1:
     if len(faces)>0:                                                              #only if faces are found save the faces in the video
      time.sleep(1.5)
      for (x, y, w, h) in faces:
-        cv2.rectangle(img, (x, y), (x + w, y + h), (255, 0, 0), 2)   #create a rectangle around image
+        cv2.rectangle(img, (x, y), (x + w, y + h), (255, 0, 0), 2)                #create a rectangle around image
 
         roi_color = img[y:y + h, x:x + w]
         cv2.imshow('img', img[y:y + h, x:x + w])
