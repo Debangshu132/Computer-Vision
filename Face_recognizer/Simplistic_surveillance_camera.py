@@ -37,37 +37,24 @@ def startCamera():
      for (x, y, w, h) in faces:
         cv2.rectangle(img, (x, y), (x + w, y + h), (255, 0, 0), 2)                #create a rectangle around image
 
-        roi_color = img[y:y + h, x:x + w]
+        roi_color = gray[y:y + h, x:x + w]
         #numpy_horizontal_concat = np.concatenate((img[y:y + h, x:x + w][1], gray[y:y + h, x:x + w]), axis=1)
         #cv2.destroyAllWindows()#
-        dim = (200, 200)
+        dim = (92, 112)
         # resize image
-        arrayOfFaces.append(cv2.resize(roi_color, dim, interpolation=cv2.INTER_AREA))
-        #cv2.imshow('img'+str(count),resized  )
+
+        resized=cv2.resize(roi_color, dim, interpolation=cv2.INTER_AREA)
+        cv2.imshow('img',resized  )
+        cv2.imwrite('found.pgm', resized)
+        return True
         count+=1
         #cv2.imwrite('found.png', roi_color)                                       #save the area of interest to memory after every 1.5 seconds
-     if len(arrayOfFaces)==1:
-         cv2.destroyWindow("img_multiple0")
-         cv2.imshow('img' + str(0), arrayOfFaces[0])
-         cv2.moveWindow('img' + str(0), 0,50);
-     else:
-         numpy_horizontal_concat = np.concatenate((arrayOfFaces[0], arrayOfFaces[1]), axis=0)
-         for i in range(2,len(arrayOfFaces)):
-              print('faces found',len(arrayOfFaces))
-              cv2.destroyWindow("img0")
-              numpy_horizontal_concat = np.concatenate((numpy_horizontal_concat, arrayOfFaces[i]), axis=0)
-              cv2.imshow('img_multiple' + str(0), numpy_horizontal_concat)
 
-              #time.sleep(3)
-    else:
-         while count>-1:
-          cv2.destroyWindow("img"+str(count))
-          count-=1
-          #cv2.imshow('img', img)                                                   #else show the normal footage
     k = cv2.waitKey(30) & 0xff
 
     if k == 27:
         break
+    return False
 
  cap.release()
  cv2.destroyAllWindows()
@@ -96,17 +83,15 @@ def inputMyFace():
                 cv2.rectangle(img, (x, y), (x + w, y + h), (255, 0, 0), 2)  # create a rectangle around image
 
                 roi_color = img[y:y + h, x:x + w]
-                # numpy_horizontal_concat = np.concatenate((img[y:y + h, x:x + w][1], gray[y:y + h, x:x + w]), axis=1)
-                # cv2.destroyAllWindows()#
 
-                dim = (200,200)
+                dim = (92,112)
                 # resize image
                 resized=cv2.resize(roi_color, dim, interpolation=cv2.INTER_AREA)
                 cv2.imshow('img'+str(count),resized )
                 count += 1
-                if iteration%100==0:
+                if iteration%40==0 and iteration<400:
                    resized = cv2.cvtColor(resized, cv2.COLOR_BGR2GRAY)  # convert to gray scale
-                   cv2.imwrite('found.png', resized )
+                   cv2.imwrite(str(int(iteration/40))+'.pgm', resized )
                    print('clicked:',iteration)
             k = cv2.waitKey(30) & 0xff
 
@@ -114,7 +99,7 @@ def inputMyFace():
                 break
     cap.release()
     cv2.destroyAllWindows()
-#inputMyFace()
+
 def read_image(filename, byteorder='>'):
     with open(filename, 'rb') as f:
         buffer = f.read()
@@ -298,25 +283,29 @@ def trainMyModel():
  #compute_accuracy(pred, y_test)
 
 
-def predictFaces(pathToImage):
-    image = read_image('orl_faces/s' + str(1) + '/' + str(1) + '.pgm', 'rw+')
+def predictFaces():
+    while True:
+     gotFace=startCamera()
+     if gotFace==True:
+      image = read_image('found.pgm', 'rw+')
+      break
+     else:
+       continue
+
     # reduce the size
     image = image[::size, ::size]
     # get the new size
     dim1,dim2 = image.shape
     model=buildModelArchitecture(dim1, dim2)
     print('the layer of the model are:')
-    for count, layer in enumerate(model.layers):
-        print(count, layer)
-
     model.load_weights('face_recognizer.h5')
 
-    def who_is_it(model, pathToImage):
-        imageVec = np.zeros(40)
-        for i in range(40):
-            print("generating imageVector:", i)
+    def who_is_it(model):
+        imageVec = np.zeros(41)
+        for i in range(41):
+            #print("generating imageVector:", i)
             img1 = read_image('orl_faces/s' + str(i + 1) + '/' + str(1) + '.pgm', 'rw+')
-            img = read_image(pathToImage)
+            img = read_image('found.pgm')
             img1 = img1[::size, ::size]
             img = img[::size, ::size]
             dim1 = img1.shape[0]
@@ -328,10 +317,18 @@ def predictFaces(pathToImage):
             imageVec[i] = model.predict([x_img[:, 0, :, :, :], x_img[:, 1, :, :, :]])
         return imageVec
 
-    arr = who_is_it(model,pathToImage )
-    print('The recognized person is:',np.argmin(arr) + 1)
+    arr = who_is_it(model )
+    if np.min(arr)<70:
+       print('The recognized person is:',np.argmin(arr) + 1)
+       print('The min value is is:', np.min(arr))
+    else:
+        print('Cannot Recognize person!')
+        print('The min value is is:', np.min(arr))
+        print('The most probable person is:', np.argmin(arr) + 1)
+
 #trainMyModel()
-predictFaces('orl_faces/s25/7.pgm')
+predictFaces()
+#inputMyFace()
 
 
 
