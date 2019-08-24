@@ -9,7 +9,7 @@ from keras import backend as K
 from keras.layers import Activation
 from keras.layers import Input, Lambda, Dense, Dropout, Convolution2D, MaxPooling2D, Flatten
 from keras.models import Sequential, Model
-from keras.optimizers import RMSprop
+from keras.optimizers import Adam,RMSprop
 
 size = 2
 total_sample_size = 10000
@@ -122,9 +122,9 @@ def euclidean_distance(vects):
 def eucl_dist_output_shape(shapes):
         shape1, shape2 = shapes
         return (shape1[0], 1)
-def contrastive_loss(y_true, y_pred):
+def contrastive_loss(y_true, distance):
         margin = 1
-        return K.mean(y_true * K.square(y_pred) + (1 - y_true) * K.square(K.maximum(margin - y_pred, 0)))
+        return K.mean(y_true * K.square(distance) + (1 - y_true) * K.square(K.maximum(margin - distance, 0)))
 
 
 def buildModelArchitecture(dim1,dim2):
@@ -139,13 +139,15 @@ def buildModelArchitecture(dim1,dim2):
                               border_mode='valid', dim_ordering='th'))
         seq.add(Activation('relu'))
         seq.add(MaxPooling2D(pool_size=(2, 2)))
-        seq.add(Dropout(.25))
+        seq.add(Dropout(.10))
 
         # convolutional layer 2
         seq.add(Convolution2D(nb_filter[1], kernel_size, kernel_size, border_mode='valid', dim_ordering='th'))
         seq.add(Activation('relu'))
         seq.add(MaxPooling2D(pool_size=(2, 2), dim_ordering='th'))
-        seq.add(Dropout(.25))
+        seq.add(Dropout(.10))
+
+
 
         # flatten
         seq.add(Flatten())
@@ -161,14 +163,14 @@ def buildModelArchitecture(dim1,dim2):
     base_network = build_base_network(input_dim)
     feat_vecs_a = base_network(input_a)
     feat_vecs_b = base_network(input_b)
-    distance = Lambda(euclidean_distance, output_shape=eucl_dist_output_shape)([feat_vecs_a, feat_vecs_b])
+    distance_layer = Lambda(euclidean_distance, output_shape=eucl_dist_output_shape)([feat_vecs_a, feat_vecs_b])
 
 
-    rms = RMSprop()
+    adam =Adam()
 
-    model = Model(input=[input_a, input_b], output=distance)
+    model = Model(input=[input_a, input_b], output=distance_layer)
 
-    model.compile(loss=contrastive_loss, optimizer=rms)
+    model.compile(loss=contrastive_loss, optimizer=adam)
     return model
 
 
@@ -269,18 +271,22 @@ def trainMyModel():
 
  img_1 = x_train[:, 0]
  img_2 = x_train[:, 1]
- epochs = 13
- model.fit([img_1, img_2], y_train, validation_split=.25, batch_size=128, verbose=2, nb_epoch=epochs)
+ epochs = 15
+ model.load_weights('face_recognizer.h5')
+ model.fit([img_1, img_2], y_train, validation_split=.25, batch_size=200, verbose=2, nb_epoch=epochs)
  model.save_weights('face_recognizer.h5')
- #model.load_weights('face_recognizer.h5')
- #pred = model.predict([x_test[:, 0], x_test[:, 1]])
- #def compute_accuracy(predictions, labels):
- #    return labels[predictions.ravel()]
+
+ pred = model.predict([x_test[:, 0], x_test[:, 1]])
+ def compute_accuracy(predictions, labels):
+     return labels[predictions.ravel()]
 
  #sklearn.metrics.accuracy_score(pred, y_test, normalize=True, sample_weight=None)'
- #for i in range(len(pred)):
- #     print(pred[i],y_test[i])
- #compute_accuracy(pred, y_test)
+ count=0
+ for i in range(len(pred)):
+      if (pred[i]>=1 and y_test[i]==0) or (pred[i]<1 and y_test[i]==1) :
+                    count+=1
+ print('the accuracy is: ',(1.0*count/len(pred)))
+ #sklearn.metrics.accuracy_score(pred, y_test, normalize=True, sample_weight=None)
 
 
 def predictFaces():
@@ -326,8 +332,8 @@ def predictFaces():
         print('The min value is is:', np.min(arr))
         print('The most probable person is:', np.argmin(arr) + 1)
 
-#trainMyModel()
-predictFaces()
+trainMyModel()
+#predictFaces()
 #inputMyFace()
 
 
