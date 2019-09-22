@@ -34,44 +34,76 @@ from __future__ import print_function
 import base64
 import requests
 import numpy as np
-import cv2
+#import cv2
 import json
+import time
+from PIL import Image
+
+
 
 # The server URL specifies the endpoint of your server running the ResNet
 # model with the name "resnet" and using the predict interface.
-SERVER_URL = 'http://localhost:8501/v1/models/resnet:predict'
+SERVER_URL = 'http://34.69.138.197:8501/v1/models/my_model:predict'
 
 # The image URL is the location of the image we should send to the server
-IMAGE_URL = 'bird.png'
 
 
-def main():
+def main(image,output_img):
   # Download the image
-  img=cv2.imread("bird.png")
-  input_image = open("bird.png", "rb").read()
-  X=np.zeros((1,img.shape[0],img.shape[1],3))
-  X[0,:,:,:]=1.0*img/255
-  #dl_request = requests.get(IMAGE_URL, stream=True)
+  #img=cv2.imread(image)
+  #img = Image.open(image)
   
-  #dl_request.raise_for_status()
-  #print(X)
+  img=image
+  print(type(img))
+  img = np.array(img)
+  print(img.shape)
+  X=np.zeros((1,img.shape[0],img.shape[1],3))
+  X[0,:,:,:]=1.0*img[:,:,:3]/255
+  prediction=manageImage(X)
+  prediction=prediction[0]
 
-  # Compose a JSON Predict request (send JPEG image in base64).
-  encoded=base64.b64encode(input_image)
-  input_string = encoded.decode('utf-8')
-  instance = [{"b64": [ [[1, 2]], [[3, 4]] ]}]
-  data = X
-  #print(type(json.dumps(str(data))))
+  #cv2.imwrite(output_img,prediction*255)   
+  return prediction*255  
+
+
+def singleRequest(X):
   data = json.dumps({"signature_name": "serving_default", "instances": X.tolist()})
+  print("waiting for server to respond")
+  t1=time.time()
   response = requests.post(SERVER_URL, data=data)
+  print("done! it took ",time.time()-t1,"seconds")
   response.raise_for_status()
-  prediction = response.json()['predictions'][0]
+  prediction = response.json()['predictions']
 
   #print('Prediction class:{}'.format(prediction))
   prediction=np.asarray(prediction)
-  mg=cv2.imwrite("bird_pred.png",prediction*255)
-  print(prediction.shape)
+  return prediction
 
 
-if __name__ == '__main__':
-  main()
+def manageImage(X):
+    final_X=X
+    num_columns=X.shape[2]
+    block_size=(400000/num_columns)
+    print(block_size)
+    num_rows=X.shape[1]
+    print("number of requests:",int(num_rows/block_size))
+    if num_rows>block_size:
+       num_full_blocks=int(num_rows/block_size)
+       for block_start in range(num_full_blocks):
+           print("done for: ",block_start)
+           final_X[:,block_start*block_size:block_start*block_size+block_size,:,:]=\
+           singleRequest(X[:,block_start*block_size:block_start*block_size+block_size,:,:])
+    else:
+      final_X=singleRequest(X)
+    return final_X
+           
+           
+
+   
+
+
+
+
+
+
+
